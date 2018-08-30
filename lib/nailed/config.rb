@@ -9,18 +9,19 @@ module Nailed
         is_valid?
 
         # init class variables:
-        @@organizations = []
-        (load_content['organizations'] || []).each do |org|
-          org_obj = Organization.new(org['name'])
-          org['repositories'].each do |repo|
-            org_obj.repositories.add(repo)
+        init_git
+        organizations.keys.each do |git|
+          (load_content[git]['organizations'] || []).each do |org|
+            org_obj = Organization.new(org['name'])
+            org['repositories'].each do |repo|
+              org_obj.repositories.add(repo)
+            end
+            @@organizations[git].push(org_obj)
           end
-          @@organizations.push(org_obj)
-        end
 
-        @@all_repositories = []
-        @@organizations.each do |org|
-          @@all_repositories.concat(org.repositories.to_a)
+          @@organizations[git].each do |org|
+            @@all_repositories[git].concat(org.repositories.to_a)
+          end
         end
       end
 
@@ -65,6 +66,17 @@ module Nailed
 
       def hash_components(product)
         @@components[product.keys.first]=product.values.last unless product.fetch("components",nil).nil?
+      end
+
+      def init_git
+        @@organizations = {}
+        @@all_repositories = {}
+        ['github','gitlab'].each do |git|
+          if !content[git].nil?
+            @@organizations[git] = []
+            @@all_repositories[git] = []
+          end
+        end
       end
 
       def load_content

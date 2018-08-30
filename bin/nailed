@@ -8,6 +8,7 @@ opts = Trollop.options do
   opt :migrate, "Migrate/Upgrade database", short: "m"
   opt :bugzilla, "Refresh bugzilla database records", short: "b"
   opt :github, "Refresh github database records", short: "g"
+  opt :gitlab, "Refresh gitlab database records", short: "G"
   opt :list, "List github repositories within organization", type: :string, short: "l"
   opt :server, "Start a dashboard webinterface", short: "s"
 end
@@ -49,6 +50,13 @@ opts.each_pair do |key, val|
       github_client = Nailed::Github.new
       github_client.get_pull_requests
       github_client.write_allpulltrends
+    end
+  when :gitlab
+    if val
+      require_relative "../lib/nailed/gitlab"
+      gitlab_client = Nailed::Gitlab.new
+      gitlab_client.get_merge_requests
+      gitlab_client.write_allmergetrends
     end
   when :list
     if val
