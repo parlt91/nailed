@@ -77,6 +77,38 @@ class NailedDB < Sequel::Migration
       Integer :open
       Integer :closed
     end
+
+    ## Gitlab tables:
+    create_table? :mergerequests do
+      Integer :mr_number, null: false
+      String :title, null: false
+      String :state, null: false
+      String :url, null: false
+      String :rname, null: false
+      String :oname
+      DateTime :created_at
+      DateTime :updated_at
+
+      primary_key [:rname, :mr_number], name: :mr_identifier
+    end
+
+    # stores trend of a specific repo:
+    create_table? :mergetrends do
+      DateTime :time
+      Integer :open
+      Integer :closed
+      String :rname, null: false
+      String :oname
+
+      primary_key [:time, :rname], name: :mergetrend_identifier
+    end
+
+    # stores trend of all repos combined:
+    create_table? :allmergetrends do
+      DateTime :time, primary_key: true
+      Integer :open
+      Integer :closed
+    end
   end
 
   def down
@@ -88,6 +120,9 @@ class NailedDB < Sequel::Migration
       "l3trends, " /
       "pullrequests, " /
       "pulltrends, " /
-      "allpulltrends"
+      "allpulltrends, " /
+      "mergerequests, " /
+      "mergetrends, " /
+      "allmergetrends"
   end
 end

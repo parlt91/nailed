@@ -31,3 +31,15 @@ end
 
 class Allpulltrend < Sequel::Model
 end
+
+## GitLab specific tables
+class Mergerequest < Sequel::Model
+  many_to_one :repository
+end
+
+class Mergetrend < Sequel::Model
+  many_to_one :repository
+end
+
+class Allmergetrend < Sequel::Model
+end
