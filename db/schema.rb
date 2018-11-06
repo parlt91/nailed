@@ -44,9 +44,9 @@ class NailedDB < Sequel::Migration
 
     end
 
-    ## Github tables:
-    create_table? :pullrequests do
-      Integer :pr_number, null: false
+    ## Github/Gitlab tables:
+    create_table? :changerequests do
+      Integer :change_number, null: false
       String :title, null: false
       String :state, null: false
       String :url, null: false
@@ -54,60 +54,31 @@ class NailedDB < Sequel::Migration
       String :oname
       DateTime :created_at
       DateTime :updated_at
+      String   :origin
       DateTime :closed_at
       DateTime :merged_at
 
-      primary_key [:rname, :pr_number], name: :pr_identifier
+      primary_key [:rname, :change_number], name: :change_identifier
     end
 
     # stores trend of a specific repo:
-    create_table? :pulltrends do
+    create_table? :changetrends do
       DateTime :time
       Integer :open
       Integer :closed
       String :rname, null: false
       String :oname
+      String :origin
 
-      primary_key [:time, :rname], name: :pulltrend_identifier
+      primary_key [:time, :rname], name: :changetrend_identifier
     end
 
     # stores trend of all repos combined:
-    create_table? :allpulltrends do
+    create_table? :allchangetrends do
       DateTime :time, primary_key: true
       Integer :open
       Integer :closed
-    end
-
-    ## Gitlab tables:
-    create_table? :mergerequests do
-      Integer :mr_number, null: false
-      String :title, null: false
-      String :state, null: false
-      String :url, null: false
-      String :rname, null: false
-      String :oname
-      DateTime :created_at
-      DateTime :updated_at
-
-      primary_key [:rname, :mr_number], name: :mr_identifier
-    end
-
-    # stores trend of a specific repo:
-    create_table? :mergetrends do
-      DateTime :time
-      Integer :open
-      Integer :closed
-      String :rname, null: false
-      String :oname
-
-      primary_key [:time, :rname], name: :mergetrend_identifier
-    end
-
-    # stores trend of all repos combined:
-    create_table? :allmergetrends do
-      DateTime :time, primary_key: true
-      Integer :open
-      Integer :closed
+      String :origin
     end
   end
 
@@ -118,11 +89,8 @@ class NailedDB < Sequel::Migration
       "bugtrends, " /
       "allbugtrends, " /
       "l3trends, " /
-      "pullrequests, " /
-      "pulltrends, " /
-      "allpulltrends, " /
-      "mergerequests, " /
-      "mergetrends, " /
-      "allmergetrends"
+      "changerequests, " /
+      "changetrends, " /
+      "allchangetrends"
   end
 end

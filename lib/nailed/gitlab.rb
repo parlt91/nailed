@@ -47,17 +47,20 @@ module Nailed
           next
         end
         merges.each do |mr|
-          attributes = { mr_number: mr.iid,
+          attributes = { change_number: mr.iid,
                          title: mr.title,
-                         state: mr.state,
+                         state: mr.state=="opened"? 'open' : mr.state,
                          url: mr.web_url,
                          created_at: mr.created_at,
                          updated_at: mr.updated_at,
+                         origin: "gitlab",
+                         closed_at: nil,
+                         merged_at: nil,
                          rname: repo.name,
-                         oname: repo.organization.name}
+                         oname: repo.organization.name }
 
           begin
-            DB[:mergerequests].insert_conflict(:replace).insert(attributes)
+            DB[:changerequests].insert_conflict(:replace).insert(attributes)
             updated_mergerequests.append(mr.iid)
           rescue Exception => e
             Nailed.logger.error("Could not write mergerequest:\n#{e}")
@@ -70,13 +73,13 @@ module Nailed
         end unless merges.empty?
 
         # check for old mergerequests of this repo and close them:
-        Mergerequest.select(:mr_number, :state, :rname).where(state: "opened", rname: repo.name).each do |mr|
-          unless updated_mergerequests.include? mr.mr_number
+        Changerequest.select(:change_number, :state, :rname).where(state: "open", rname: repo.name, origin: "gitlab").each do |mr|
+          unless updated_mergerequests.include? mr.change_number
             begin
               mr.update(state: "closed")
-              Nailed.logger.info("Closed old mergerequest: #{repo.name}/#{mr.mr_number}")
+              Nailed.logger.info("Closed old mergerequest: #{repo.name}/#{mr.change_number}")
             rescue Exception => e
-              Nailed.logger.error("Could not close mergerequest #{repo.name}/#{mr.mr_number}:\n#{e}")
+              Nailed.logger.error("Could not close mergerequest #{repo.name}/#{mr.change_number}:\n#{e}")
             end
           end
         end
@@ -87,16 +90,17 @@ module Nailed
 
     def write_mergetrends(org, repo)
       Nailed.logger.info("#{__method__}: Writing merge trends for #{org}/#{repo}")
-      open = Mergerequest.where(rname: repo, state: "opened").count
-      closed = Mergerequest.where(rname: repo, state: "closed").count
+      open = Changerequest.where(rname: repo, state: "open", origin: "gitlab").count
+      closed = Changerequest.where(rname: repo, state: "closed", origin: "gitlab").count
       attributes = { time: Time.new.strftime("%Y-%m-%d %H:%M:%S"),
                      open: open,
                      closed: closed,
                      oname: org,
-                     rname: repo }
+                     rname: repo,
+                     origin: "gitlab" }
 
       begin
-        DB[:mergetrends].insert(attributes)
+        DB[:changetrends].insert(attributes)
       rescue Exception => e
         Nailed.logger.error("Could not write merge trend for #{org}/#{repo}:\n#{e}")
       end
@@ -106,13 +110,14 @@ module Nailed
 
     def write_allmergetrends
       Nailed.logger.info("#{__method__}: Writing merge trends for all repos")
-      open = Mergerequest.where(state: "opened").count
-      closed = Mergerequest.where(state: "closed").count
+      open = Changerequest.where(state: "open", origin: "gitlab").count
+      closed = Changerequest.where(state: "closed", origin: "gitlab").count
       attributes = { time: Time.new.strftime("%Y-%m-%d %H:%M:%S"),
                      open: open,
-                     closed: closed}
+                     closed: closed,
+                     origin: "gitlab" }
       begin
-        DB[:allmergetrends].insert(attributes)
+        DB[:allchangetrends].insert(attributes)
       rescue Exception => e
         Nailed.logger.error("Could not write allmerge trend:\n#{e}")
       end

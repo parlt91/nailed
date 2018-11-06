@@ -20,26 +20,14 @@ end
 class L3trend < Sequel::Model
 end
 
-## GitHub specific tables
-class Pullrequest < Sequel::Model
+## GitHub/GitLab specific tables
+class Changerequest < Sequel::Model
   many_to_one :repository
 end
 
-class Pulltrend < Sequel::Model
+class Changetrend < Sequel::Model
   many_to_one :repository
 end
 
-class Allpulltrend < Sequel::Model
-end
-
-## GitLab specific tables
-class Mergerequest < Sequel::Model
-  many_to_one :repository
-end
-
-class Mergetrend < Sequel::Model
-  many_to_one :repository
-end
-
-class Allmergetrend < Sequel::Model
+class Allchangetrend < Sequel::Model
 end
