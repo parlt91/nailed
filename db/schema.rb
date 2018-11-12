@@ -70,15 +70,17 @@ class NailedDB < Sequel::Migration
       String :oname
       String :origin
 
-      primary_key [:time, :rname], name: :changetrend_identifier
+      primary_key [:time, :rname, :origin], name: :changetrend_identifier
     end
 
     # stores trend of all repos combined:
     create_table? :allchangetrends do
-      DateTime :time, primary_key: true
+      DateTime :time
       Integer :open
       Integer :closed
       String :origin
+
+      primary_key [:time, :origin], name: :allchangetrend_identifier
     end
   end
 

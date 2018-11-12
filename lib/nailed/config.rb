@@ -5,22 +5,28 @@ require_relative '../nailed'
 module Nailed
   class Config
     class << self
+
+      # list of supported version-control-systems
+      @@supported_vcs = [ 'github', 'gitlab' ]
+
       def parse_config
         is_valid?
 
+        # init class variables for supported VCS's
+        init_vcs
+
         # init class variables:
-        init_git
-        organizations.keys.each do |git|
-          (load_content[git]['organizations'] || []).each do |org|
+        organizations.keys.each do |vcs|
+          (load_content[vcs]['organizations'] || []).each do |org|
             org_obj = Organization.new(org['name'])
             org['repositories'].each do |repo|
               org_obj.repositories.add(repo)
             end
-            @@organizations[git].push(org_obj)
+            @@organizations[vcs].push(org_obj)
           end
 
-          @@organizations[git].each do |org|
-            @@all_repositories[git].concat(org.repositories.to_a)
+          @@organizations[vcs].each do |org|
+            @@all_repositories[vcs].concat(org.repositories.to_a)
           end
         end
       end
@@ -58,6 +64,10 @@ module Nailed
         @@all_repositories
       end
 
+      def supported_vcs
+        @@supported_vcs
+      end
+
       def content
         load_content
       end
@@ -68,13 +78,13 @@ module Nailed
         @@components[product.keys.first]=product.values.last unless product.fetch("components",nil).nil?
       end
 
-      def init_git
+      def init_vcs
         @@organizations = {}
         @@all_repositories = {}
-        ['github','gitlab'].each do |git|
-          if !content[git].nil?
-            @@organizations[git] = []
-            @@all_repositories[git] = []
+        @@supported_vcs.each do |vcs|
+          if content.keys.map(&:downcase).include?(vcs)
+            @@organizations[vcs] = []
+            @@all_repositories[vcs] = []
           end
         end
       end
