@@ -23,9 +23,10 @@ class App < Sinatra::Base
     @bugzilla = Nailed::Config.content.fetch("bugzilla")
     @products = Nailed::Config.products
     @product_query = @products.join("&product=")
-    @orgs = Nailed::Config.organizations['github'] # TODO: adapt for gitlab
-    @org_query = @orgs.map { |o| o.name.dup.prepend("user%3A") }.join("+")
+    @orgs = Nailed::Config.organizations['github']
+    @org_query = @orgs.map { |o| o.name.dup.prepend("user%3A") }.join("+") unless @orgs.nil?
     @changes_repos = Nailed::Config.all_repositories
+    @supported_vcs = Nailed::Config.supported_vcs
     @colors = Nailed.get_colors
   end
 
@@ -122,16 +123,14 @@ class App < Sinatra::Base
           else
             ""
           end
-        Nailed::Config.supported_vcs.each do |vcs|
+        @supported_vcs.each do |vcs|
           origin.concat("(SELECT open FROM #{table} WHERE origin='#{vcs}') AS #{vcs},")
         end
         trends = Allchangetrend.fetch("SELECT DISTINCT time, " \
                                       "#{origin.rpartition(",").first} " \
                                       "FROM #{table} #{filter}")
         trends.each do |col|
-          json << { time: col.time.strftime("%Y-%m-%d %H:%M:%S"),
-                    github: col[:github],
-                    gitlab: col[:gitlab] }
+          json << col.values.merge({time: col.time.strftime("%Y-%m-%d %H:%M:%S")})
         end
       when :allbugs
         table = "allbugtrends"
@@ -331,7 +330,7 @@ class App < Sinatra::Base
   #
   get "/json/changes/donut/allchanges" do
     changetop = []
-    open_changes = Changerequest.where(state: "open")
+    open_changes = Changerequest.where(state: "open", origin: @supported_vcs)
     grouped_changes = open_changes.group_and_count(:rname,
                                                    :oname,
                                                    :origin).all
