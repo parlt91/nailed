@@ -1,14 +1,19 @@
 function index(colors, product_query, org_query){
-  $.getJSON("/json/github/donut/allpulls", function (json) {
+  $.getJSON("/json/changes/donut/allchanges", function (json) {
+    function set_col() {
+      var cols = new Array();
+      for ( var x in json) {
+        if (json[x]["origin"] == "github")
+          cols.push(colors["github"]["col".concat(parseInt(x)%5+1)]);
+        else if (json[x]["origin"] == "gitlab")
+          cols.push(colors["gitlab"]["col".concat(parseInt(x)%5+1)]);
+      }
+      return cols;
+    }
     new Morris.Donut({
       element: 'pull_top',
       data: json,
-      colors: [ colors["pie"]["red"],
-                colors["pie"]["orange"],
-                colors["pie"]["yellow"],
-                colors["pie"]["green"],
-                colors["pie"]["blue"]
-              ],
+      colors: set_col(),
       resize: true,
       formatter: function(y, data){
         return y;
@@ -17,7 +22,7 @@ function index(colors, product_query, org_query){
       if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
         jQuery.noop();
       else
-        window.open("/github/"+row.label,"_self");
+        window.open("/"+row.origin+"/"+row.label,"_self");
     });
   });
   $.getJSON("/json/bugzilla/donut/allbugs", function (json) {
@@ -88,14 +93,21 @@ function index(colors, product_query, org_query){
         window.open("https://bugzilla.suse.com/buglist.cgi?product="+product_query+"&query_format=advanced&resolution=---");
     });
   });
-  $.getJSON("/json/github/trend/allpulls", function (json) {
+  $.getJSON("/json/changes/trend/allopenchanges", function (json) {
+    
+    //var origins = $.map(json, function(json) { return json["origin"]; });
+    //var origin = origins.filter(function(item, index, origins) {
+    //  return origins.indexOf(item) == index;
+    //});
+
+    console.log(origin);
     new Morris.Line({
-      element: 'allpulls_trend',
+      element: "allchanges_trend",
       data: json,
       xkey: 'time',
-      ykeys: ['open'],
+      ykeys: ['github','gitlab'], //origin,
       yLabelFormat: function(y){return y != Math.round(y)?'':y;},
-      labels: ['Open'],
+      labels: ['Github','Gitlab'], //origin,
       resize: true,
       hideHover: true,
       lineColors: [ colors["line"]["red"],

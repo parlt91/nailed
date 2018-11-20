@@ -25,6 +25,7 @@ class App < Sinatra::Base
     @product_query = @products.join("&product=")
     @orgs = Nailed::Config.organizations['github'] # TODO: adapt for gitlab
     @org_query = @orgs.map { |o| o.name.dup.prepend("user%3A") }.join("+")
+    @changes_repos = Nailed::Config.all_repositories
     @colors = Nailed.get_colors
   end
 
@@ -82,7 +83,7 @@ class App < Sinatra::Base
           json << { time: col.time.strftime("%Y-%m-%d %H:%M:%S"),
                     open: col.open, fixed: col.fixed }
         end
-      when :pull
+      when :change
         table = "changetrends"
         sql_statement =
           if (Changetrend.where(oname: item[0], rname: item[1]).count > 20)
@@ -109,8 +110,9 @@ class App < Sinatra::Base
           json << { time: col.time.strftime("%Y-%m-%d %H:%M:%S"),
                     open: col.open }
         end
-      when :allpulls
+      when :allopenchanges
         table = "allchangetrends"
+        origin = ""
         filter =
           if Allchangetrend.count > 20
             # we only want roughly 20 data points and the newest data point:
@@ -120,10 +122,16 @@ class App < Sinatra::Base
           else
             ""
           end
-        trends = Allbugtrend.fetch("SELECT * FROM #{table} #{filter}")
+        Nailed::Config.supported_vcs.each do |vcs|
+          origin.concat("(SELECT open FROM #{table} WHERE origin='#{vcs}') AS #{vcs},")
+        end
+        trends = Allchangetrend.fetch("SELECT DISTINCT time, " \
+                                      "#{origin.rpartition(",").first} " \
+                                      "FROM #{table} #{filter}")
         trends.each do |col|
           json << { time: col.time.strftime("%Y-%m-%d %H:%M:%S"),
-                    open: col.open }
+                    github: col[:github],
+                    gitlab: col[:gitlab] }
         end
       when :allbugs
         table = "allbugtrends"
@@ -165,12 +173,6 @@ class App < Sinatra::Base
     def get_label(product)
       components = Nailed::Config.components[product]
       label = components.nil? ? product : product + "/#{components.length > 1 ? 'subset' : components.fetch(0)}"
-    end
-
-    ### github helpers
-
-    def get_github_repos
-      Nailed::Config.all_repositories['github']
     end
   end
 
@@ -303,58 +305,62 @@ class App < Sinatra::Base
     end
 
   #
-  # GITHUB Routes
+  # CHANGES Routes
   #
 
   #
   # trends
   #
-  github_repos = Changerequest.order(Sequel.desc(:created_at)).all.map do |row|
+  changes_repos = Changerequest.order(Sequel.desc(:created_at)).all.map do |row|
     [row.oname, row.rname]
   end.uniq
 
-  github_repos.each do |repo|
-    get "/json/github/#{repo[0]}/#{repo[1]}/trend/open" do
-      get_trends(:pull, repo)
+  changes_repos.each do |repo|
+    get "/json/changes/#{repo[0]}/#{repo[1]}/trend/open" do
+      get_trends(:change, repo)
     end
   end
 
-  # all open pull requests
-  get "/json/github/trend/allpulls" do
-    get_trends(:allpulls, nil)
+  # all open change requests
+  get "/json/changes/trend/allopenchanges" do
+    get_trends(:allopenchanges, nil)
   end
 
   #
   # donut
   #
-  get "/json/github/donut/allpulls" do
-    pulltop = []
-    open_pulls = Changerequest.where(state: "open")
-    grouped_pulls = open_pulls.group_and_count(:rname,
-                                               :oname).all
-    grouped_pulls.each do |pull|
-      pulltop << { label: "#{pull.oname}/#{pull.rname}",
-                   value: pull[:count] }
+  get "/json/changes/donut/allchanges" do
+    changetop = []
+    open_changes = Changerequest.where(state: "open")
+    grouped_changes = open_changes.group_and_count(:rname,
+                                                   :oname,
+                                                   :origin).all
+    grouped_changes.each do |change|
+      changetop << { label: "#{change.oname}/#{change.rname}",
+                     value: change[:count],
+                     origin: change.origin }
     end
-    pulltop.to_json
+    changetop.to_json
   end
 
   #
   # tables
   #
 
-  # allopenpulls
-  get "/json/github/allopenpulls" do
-    Changerequest.where(state: "open").naked.all.to_json
+  # allopenchanges
+  Nailed::Config.supported_vcs.each do |vcs|
+    get "/json/#{vcs}/allopenchanges" do
+      Changerequest.where(state: "open", origin: vcs).naked.all.to_json
+    end
   end
 
   # all open pull requests for repo
-  github_repos = Changerequest.where(state: "open").order(Sequel.desc(:created_at)).map do |row|
+  changes_repos = Changerequest.where(state: "open").order(Sequel.desc(:created_at)).map do |row|
     [row.oname, row.rname]
   end.uniq
 
-  github_repos.each do |repo|
-    get "/json/github/#{repo[0]}/#{repo[1]}/open" do
+  changes_repos.each do |repo|
+    get "/json/changes/#{repo[0]}/#{repo[1]}/open" do
       Changerequest.where(
         state: "open",
         rname: repo[1],
@@ -367,35 +373,31 @@ class App < Sinatra::Base
   #
 
   get "/" do
-    @github_repos = get_github_repos
-
     haml :index
   end
 
-    Nailed::Config.products.each do |product|
-      get "/#{product.tr(" ", "_")}/bugzilla" do
-        @github_repos = get_github_repos
+  Nailed::Config.products.each do |product|
+    get "/#{product.tr(" ", "_")}/bugzilla" do
+      @product = get_label(product)
+      @product_ = product.tr(" ", "_")
 
-        @product = get_label(product)
-        @product_ = product.tr(" ", "_")
-
-        haml :bugzilla
-      end
+      haml :bugzilla
     end
+  end
 
-  github_repos = Changerequest.order(Sequel.desc(:created_at)).all.map do |row|
-    [row.oname, row.rname]
-  end.uniq
+  Nailed::Config.supported_vcs.each do |vcs|
+    changes_repos = Changerequest.where(origin: vcs).order(Sequel.desc(:created_at)).all.map do |row|
+      [row.oname, row.rname, row.url.rpartition("/").first]
+    end.uniq
 
-  github_repos.each do |repo|
-    get "/github/#{repo[0]}/#{repo[1]}" do
-      @github_repos = get_github_repos
+    changes_repos.each do |repo|
+      get "/#{vcs}/#{repo[0]}/#{repo[1]}" do
+        @org = repo[0]
+        @repo = repo[1]
+        @url = repo[2].concat(repo[2].end_with?("s") ? "" : "s")
 
-      @repo = repo[1]
-      @org = repo[0]
-      @github_url_all_pulls = "https://github.com/#{@org}/#{repo}/pulls"
-
-      haml :github
+        haml :changes
+      end
     end
   end
 
@@ -412,8 +414,6 @@ class App < Sinatra::Base
   end
 
   get "/help" do
-    @github_repos = get_github_repos
-
     haml :help
   end
 

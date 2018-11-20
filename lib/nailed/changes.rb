@@ -7,14 +7,36 @@ module Nailed
     Config.supported_vcs.each do |vcs|
       client = const_get(vcs.capitalize).new
       client.get_change_requests
-      client.write_allchangetrends
     end
+    write_allchangetrends
   end
 
   def list_org_repos(client, org)
     repos = client.get_org_repos(org)
     repos = repos.map(&:name)
     repos.each { |r| puts "- #{r}" }
+  end
+
+  def write_allchangetrends
+    Nailed.logger.info("#{__method__}: Writing change trends for all repos")
+    time = Time.new.strftime("%Y-%m-%d %H:%M:%S")
+    origin = Changerequest.select(:origin).distinct
+    origin.each do |origin|
+      open = Changerequest.where(state: "open", origin: origin[:origin]).count
+      closed = Changerequest.where(state: "closed", origin: origin[:origin]).count
+      attributes = { time: time,
+                     open: open,
+                     closed: closed,
+                     origin: origin[:origin] }
+      begin
+        puts attributes[:time]
+        DB[:allchangetrends].insert(attributes)
+      rescue Exception => e
+        Nailed.logger.error("Could not write all #{origin} change trends:\n#{e}")
+      end
+
+      Nailed.logger.debug("#{__method__}: Saved #{attributes.inspect}")
+    end
   end
 
   class Changes
@@ -64,10 +86,10 @@ module Nailed
             begin
               change.update(state: "closed")
               Nailed.logger.info("Closed old #{@origin} changerequest: " \
-                                 "#{repo.name}/#{attributes[:change_number]}")
+                                 "#{repo.name}/#{change.change_number}")
             rescue Exception => e
               Nailed.logger.error("Could not close #{@origin} changerequest " \
-                                  "#{repo.name}/#{attributesi[:change_number]}:\n#{e}")
+                                  "#{repo.name}/#{change.change_number}:\n#{e}")
             end
           end
         end
@@ -91,24 +113,6 @@ module Nailed
         DB[:changetrends].insert(attributes)
       rescue Exception => e
         Nailed.logger.error("Could not write #{@origin} change trend for #{org}/#{repo}:\n#{e}")
-      end
-
-      Nailed.logger.debug("#{__method__}: Saved #{attributes.inspect}")
-    end
-
-    def write_allchangetrends
-       Nailed.logger.info("#{__method__}: Writing change trends for all #{@origin} repos")
-      open = Changerequest.where(state: "open", origin: @origin).count
-      closed = Changerequest.where(state: "closed", origin: @origin).count
-      attributes = { time: Time.new.strftime("%Y-%m-%d %H:%M:%S"),
-                     open: open,
-                     closed: closed,
-                     origin: @origin }
-      begin
-        puts attributes[:time]
-        DB[:allchangetrends].insert(attributes)
-      rescue Exception => e
-        Nailed.logger.error("Could not write all #{@origin} change trends:\n#{e}")
       end
 
       Nailed.logger.debug("#{__method__}: Saved #{attributes.inspect}")

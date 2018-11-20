@@ -65,7 +65,13 @@ module Nailed
       end
 
       def supported_vcs
-        @@supported_vcs
+        supportedVCS = Array.new
+        @@supported_vcs.each do |vcs|
+          if content.keys.map(&:downcase).include?(vcs)
+            supportedVCS.append(vcs)
+          end
+        end
+        return supportedVCS
       end
 
       def content
@@ -79,13 +85,11 @@ module Nailed
       end
 
       def init_vcs
-        @@organizations = {}
-        @@all_repositories = {}
-        @@supported_vcs.each do |vcs|
-          if content.keys.map(&:downcase).include?(vcs)
-            @@organizations[vcs] = []
-            @@all_repositories[vcs] = []
-          end
+        @@organizations = Hash.new
+        @@all_repositories = Hash.new
+        supported_vcs.each do |vcs|
+          @@organizations[vcs] = Array.new
+          @@all_repositories[vcs] = Array.new
         end
       end
 
