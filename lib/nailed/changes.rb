@@ -29,7 +29,6 @@ module Nailed
                      closed: closed,
                      origin: origin[:origin] }
       begin
-        puts attributes[:time]
         DB[:allchangetrends].insert(attributes)
       rescue Exception => e
         Nailed.logger.error("Could not write all #{origin} change trends:\n#{e}")
