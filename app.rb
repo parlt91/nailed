@@ -119,16 +119,17 @@ class App < Sinatra::Base
             # we only want roughly 20 data points and the newest data point:
             "WHERE (rowid % ((SELECT COUNT(*) " \
             "FROM #{table})/20) = 0) " \
-            "OR (time = (SELECT MAX(time) FROM #{table}));"
+            "OR (time = (SELECT MAX(time) FROM #{table}))"
           else
             ""
           end
         @supported_vcs.each do |vcs|
-          origin.concat("(SELECT open FROM #{table} WHERE origin='#{vcs}') AS #{vcs},")
+          origin.concat("LEFT JOIN (SELECT time as t_#{vcs}, open as #{vcs} " \
+                        "FROM #{table} WHERE origin='#{vcs}') ON time=t_#{vcs} ")
         end
-        trends = Allchangetrend.fetch("SELECT DISTINCT time, " \
-                                      "#{origin.rpartition(",").first} " \
-                                      "FROM #{table} #{filter}")
+        trends = Allchangetrend.fetch("SELECT time, #{@supported_vcs.join(', ')} " \
+                                      "FROM ((SELECT DISTINCT time FROM #{table} " \
+                                      "#{filter}) #{origin})")
         trends.each do |col|
           json << col.values.merge({time: col.time.strftime("%Y-%m-%d %H:%M:%S")})
         end
