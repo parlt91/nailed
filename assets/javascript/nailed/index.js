@@ -104,8 +104,8 @@ function index(colors, product_query, org_query){
       labels: origin,
       resize: true,
       hideHover: true,
-      lineColors: [ colors["line"]["red"],
-                    colors["line"]["green"]
+      lineColors: [ colors["line"]["blue"],
+                    colors["line"]["red"]
                   ],
       smooth: false,
       continuousLine: true,
