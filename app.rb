@@ -385,16 +385,19 @@ class App < Sinatra::Base
     end
   end
 
-  Nailed::Config.supported_vcs.each do |vcs|
-    changes_repos = Changerequest.where(origin: vcs).order(Sequel.desc(:created_at)).all.map do |row|
-      [row.oname, row.rname, row.url.rpartition("/").first]
-    end.uniq
+  Nailed::Config.all_repositories.keys.each do |vcs|
+    Nailed::Config.all_repositories[vcs].each do |repo|
+      get "/#{vcs}/#{repo.organization.name}/#{repo.name}" do
+        @org = repo.organization.name
+        @repo = repo.name
 
-    changes_repos.each do |repo|
-      get "/#{vcs}/#{repo[0]}/#{repo[1]}" do
-        @org = repo[0]
-        @repo = repo[1]
-        @url = repo[2].concat(repo[2].end_with?("s") ? "" : "s")
+        if vcs == "github"
+          @url = "https://github.com/#{repo.organization.name}/#{repo.name}/pulls"
+        elsif vcs == "gitlab"
+          url = Nailed::Config.content["gitlab"]["endpoint"]
+          url.slice! "/api/v4/"
+          @url = "#{url}/#{repo.organization.name}/#{repo.name}/merge_requests"
+        end
 
         haml :changes
       end
